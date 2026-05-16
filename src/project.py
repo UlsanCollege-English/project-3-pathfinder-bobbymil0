@@ -39,6 +39,21 @@ from pathlib import Path
 Graph = dict[str, dict[str, int]]
 
 
+def _validate_graph(graph: Graph) -> None:
+    for node, neighbors in graph.items():
+        if not isinstance(node, str):
+            raise ValueError("Graph nodes must be strings")
+        if not isinstance(neighbors, dict):
+            raise ValueError("Each node must map to a dictionary of neighbors")
+        for neighbor, weight in neighbors.items():
+            if not isinstance(neighbor, str):
+                raise ValueError("Neighbor names must be strings")
+            if not isinstance(weight, int):
+                raise ValueError("Edge weights must be integers")
+            if weight <= 0:
+                raise ValueError("Edge weights must be positive integers")
+
+
 def load_graph(path: str) -> Graph:
     """Load a weighted graph from a JSON file.
 
@@ -61,7 +76,23 @@ def load_graph(path: str) -> Graph:
     This project uses an undirected graph. Your own map should include both
     directions for every edge, such as A -> B and B -> A.
     """
-    raise NotImplementedError
+    map_path = Path(path)
+    raw_data = json.loads(map_path.read_text(encoding="utf-8"))
+    if not isinstance(raw_data, dict):
+        raise ValueError("Graph JSON must contain a dictionary at the top level")
+    graph: Graph = {}
+    for node, neighbors in raw_data.items():
+        if not isinstance(neighbors, dict):
+            raise ValueError("Each node must map to a dictionary of neighbors")
+        graph[node] = {}
+        for neighbor, weight in neighbors.items():
+            if not isinstance(weight, int):
+                raise ValueError("Edge weights must be integers")
+            if weight <= 0:
+                raise ValueError("Edge weights must be positive integers")
+            graph[node][neighbor] = weight
+    _validate_graph(graph)
+    return graph
 
 
 def get_neighbors(graph: Graph, node: str) -> dict[str, int]:
@@ -74,7 +105,7 @@ def get_neighbors(graph: Graph, node: str) -> dict[str, int]:
         get_neighbors(graph, "A") -> {"B": 4}
         get_neighbors(graph, "Z") -> {}
     """
-    raise NotImplementedError
+    return graph.get(node, {})
 
 
 def bfs_order(graph: Graph, start: str) -> list[str]:
@@ -91,7 +122,19 @@ def bfs_order(graph: Graph, start: str) -> list[str]:
     - Time: O(V + E)
     - Space: O(V)
     """
-    raise NotImplementedError
+    if start not in graph:
+        return []
+    visited: set[str] = {start}
+    order: list[str] = []
+    queue = deque([start])
+    while queue:
+        node = queue.popleft()
+        order.append(node)
+        for neighbor in graph.get(node, {}):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+    return order
 
 
 def dijkstra_distances(graph: Graph, start: str) -> dict[str, float]:
@@ -118,7 +161,21 @@ def dijkstra_distances(graph: Graph, start: str) -> dict[str, float]:
     - Time: O((V + E) log V)
     - Space: O(V)
     """
-    raise NotImplementedError
+    if start not in graph:
+        return {}
+    _validate_graph(graph)
+    distances: dict[str, float] = {start: 0.0}
+    heap: list[tuple[float, str]] = [(0.0, start)]
+    while heap:
+        current_distance, node = heapq.heappop(heap)
+        if current_distance > distances[node]:
+            continue
+        for neighbor, weight in graph.get(node, {}).items():
+            distance = current_distance + float(weight)
+            if neighbor not in distances or distance < distances[neighbor]:
+                distances[neighbor] = distance
+                heapq.heappush(heap, (distance, neighbor))
+    return distances
 
 
 def shortest_path(graph: Graph, start: str, target: str) -> list[str]:
@@ -139,7 +196,38 @@ def shortest_path(graph: Graph, start: str, target: str) -> list[str]:
     - Dijkstra portion: O((V + E) log V)
     - Path reconstruction: O(P), where P is the number of nodes in the path
     """
-    raise NotImplementedError
+    if start not in graph or target not in graph:
+        return []
+    if start == target:
+        return [start]
+    _validate_graph(graph)
+    distances: dict[str, float] = {start: 0.0}
+    parents: dict[str, str] = {}
+    heap: list[tuple[float, str]] = [(0.0, start)]
+    while heap:
+        current_distance, node = heapq.heappop(heap)
+        if current_distance > distances[node]:
+            continue
+        if node == target:
+            break
+        for neighbor, weight in graph.get(node, {}).items():
+            distance = current_distance + float(weight)
+            if neighbor not in distances or distance < distances[neighbor]:
+                distances[neighbor] = distance
+                parents[neighbor] = node
+                heapq.heappush(heap, (distance, neighbor))
+    if target not in distances:
+        return []
+    path: list[str] = []
+    current = target
+    while current != start:
+        path.append(current)
+        current = parents.get(current)
+        if current is None:
+            return []
+    path.append(start)
+    path.reverse()
+    return path
 
 
 def demo() -> None:
@@ -155,7 +243,27 @@ def demo() -> None:
     This function is not directly graded by the public tests, but it is useful
     for your presentation/demo.
     """
-    raise NotImplementedError
+    map_file = Path(__file__).resolve().parent.parent / "data" / "map.json"
+    graph = load_graph(str(map_file))
+
+    if not graph:
+        print("Graph is empty or could not be loaded.")
+        return
+    start = next(iter(graph))
+    target = None
+    for node in graph:
+        if node != start:
+            target = node
+            break
+
+    print(f"Loaded graph with {len(graph)} locations.")
+    print(f"BFS order from {start}: {bfs_order(graph, start)}")
+    print(f"Shortest distances from {start}:")
+    distances = dijkstra_distances(graph, start)
+    for node, distance in sorted(distances.items()):
+        print(f"  {node}: {distance}")
+    if target is not None:
+        print(f"Shortest path from {start} to {target}: {shortest_path(graph, start, target)}")
 
 
 if __name__ == "__main__":

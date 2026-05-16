@@ -88,6 +88,37 @@ def test_load_graph_rejects_negative_weight(tmp_path):
         load_graph(str(map_path))
 
 
+def test_load_graph_rejects_non_dict_top_level(tmp_path):
+    graph_data = ["A", "B"]
+    map_path = tmp_path / "bad_map.json"
+    map_path.write_text(json.dumps(graph_data), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        load_graph(str(map_path))
+
+
+def test_load_graph_rejects_non_dict_neighbor_list(tmp_path):
+    graph_data = {
+        "A": ["B", "C"],
+    }
+    map_path = tmp_path / "bad_map.json"
+    map_path.write_text(json.dumps(graph_data), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        load_graph(str(map_path))
+
+
+def test_bfs_order_follows_neighbor_dictionary_order():
+    graph = {
+        "A": {"X": 1, "B": 1},
+        "X": {"A": 1},
+        "B": {"A": 1, "C": 1},
+        "C": {"B": 1},
+    }
+
+    assert bfs_order(graph, "A") == ["A", "X", "B", "C"]
+
+
 def test_get_neighbors_existing_node():
     graph = sample_graph()
 
